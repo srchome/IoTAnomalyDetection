@@ -1,0 +1,68 @@
+﻿@page "/dashboard"
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Collections.Concurrent
+@using System.Text.Json
+@using global::Dashboard.Shared
+@using global::Shared
+@inject NavigationManager Navigation
+
+<h3>📡 Real-Time Sensor Dashboard</h3>
+
+@if (sensorDataMap.Count == 0)
+{
+    <p>Waiting for sensor data...</p>
+}
+else
+{
+    foreach (var data in sensorDataMap.Values.OrderBy(d => d.SensorId))
+    {
+        <div class="sensor-card @(data.IsAnomaly ? "anomaly" : "")">
+            <strong>Sensor:</strong> @data.SensorId |
+            <strong>Value:</strong> @data.Value |
+            <strong>Anomaly:</strong> @data.IsAnomaly |
+            <strong>Time:</strong> @data.Timestamp.ToString("u")
+        </div>
+    }
+}
+
+@code {
+    private HubConnection? hubConnection;
+    private ConcurrentDictionary<string, SensorData> sensorDataMap = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("http://localhost:5023/sensorhub", options =>
+            {
+                // You can add auth headers or tokens here if needed
+                // For now, no special options are required
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<SensorData>("ReceiveSensorData", (data) =>
+        {
+            Console.WriteLine($"📥 Dashboard Received: {JsonSerializer.Serialize(data)}");
+            sensorDataMap[data.SensorId] = data;
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveSensorData", raw =>
+        {
+            Console.WriteLine($"🧩 Raw SignalR JSON: {raw}");
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+            Console.WriteLine("✅ SignalR connected.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Failed to connect to SignalR hub: {ex.Message}");
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+}

@@ -1,0 +1,84 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>📡 Multi-Sensor Real-Time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@7.0.5/dist/browser/signalr.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .sensor-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .sensor-card {
+            border: 1px solid #ccc;
+            padding: 16px;
+            width: 250px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .anomaly {
+            border-color: red;
+            background-color: #ffe6e6;
+        }
+    </style>
+</head>
+<body>
+    <h1>📡 Real-Time Multi-Sensor Dashboard</h1>
+    <div id="sensorContainer" class="sensor-container"></div>
+
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("http://localhost:5023/sensorhub")
+            .withAutomaticReconnect()
+            .build();
+
+        const sensorContainer = document.getElementById("sensorContainer");
+
+        function updateSensorCard(data) {
+            const id = data.sensorId || "Unknown";
+            let card = document.getElementById(`sensor-${id}`);
+
+            const anomalyClass = data.isAnomaly ? 'anomaly' : '';
+
+            const content = `
+            <h3>Sensor: ${id}</h3>
+            <p><strong>Value:</strong> ${data.value}</p>
+            <p><strong>Anomaly:</strong> ${data.isAnomaly}</p>
+            <p><strong>Time:</strong> ${data.timestamp}</p>
+          `;
+
+            if (!card) {
+                card = document.createElement("div");
+                card.id = `sensor-${id}`;
+                card.className = `sensor-card ${anomalyClass}`;
+                card.innerHTML = content;
+                sensorContainer.appendChild(card);
+            } else {
+                card.className = `sensor-card ${anomalyClass}`;
+                card.innerHTML = content;
+            }
+        }
+
+        connection.on("ReceiveSensorData", updateSensorCard);
+
+        connection.start()
+            .then(() => console.log("✅ Connected to SignalR Hub"))
+            .catch(err => console.error("❌ SignalR connection error:", err));
+    </script>
+</body>
+</html>
+
